@@ -1,41 +1,185 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Captura de ubicación</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reloj Checador</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0e0f13;
+      --card:#171923;
+      --text:#eef2ff;
+      --muted:#a2a8bd;
+      --brand:#4f8cff;
+      --brand-pressed:#3a6ad1;
+      --success:#2ecc71;
+      --warning:#ffb020;
+      --error:#ff5d5d;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; background:radial-gradient(1200px 600px at 50% -10%, #1d2140 0%, #10121a 55%, #0b0c11 100%);
+      color:var(--text); font-family:'Inter',system-ui,Segoe UI,Roboto,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; display:flex; align-items:center; justify-content:center;
+      padding:24px;
+    }
+    .card{
+      width:100%; max-width:440px; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:28px 22px 24px; text-align:center; backdrop-filter: blur(8px);
+    }
+    .logo{font-size:28px; line-height:1; margin-bottom:6px}
+    .title{font-weight:600; font-size:22px; letter-spacing:.2px}
+    .subtitle{margin-top:6px; color:var(--muted); font-size:14px}
+    .clock{
+      margin:18px 0 8px; font-weight:600; font-variant-numeric:tabular-nums;
+      font-size:42px; letter-spacing:1px;
+    }
+    .date{color:var(--muted); font-size:13px; margin-bottom:18px}
+    .btn{
+      display:inline-flex; gap:10px; align-items:center; justify-content:center;
+      width:100%; max-width:280px; margin:12px auto 0; padding:14px 18px;
+      font-size:16px; font-weight:600; color:#fff; background:var(--brand);
+      border:none; border-radius:14px; cursor:pointer; transition:transform .08s ease, background .2s ease, opacity .2s ease;
+      box-shadow:0 8px 24px rgba(79,140,255,.35);
+    }
+    .btn:active{transform:translateY(1px); background:var(--brand-pressed)}
+    .btn[disabled]{opacity:.6; cursor:not-allowed; transform:none}
+
+    .hint{color:var(--muted); font-size:12px; margin-top:10px}
+    .status{
+      margin-top:16px; font-size:14px; line-height:1.5; color:var(--muted);
+    }
+    .status.ok{color:var(--success)}
+    .status.warn{color:var(--warning)}
+    .status.err{color:var(--error)}
+    .spinner{
+      width:16px; height:16px; border-radius:50%;
+      border:2px solid rgba(255,255,255,.25); border-top-color:#fff; animation:spin .9s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .foot{
+      margin-top:18px; color:var(--muted); font-size:11px; opacity:.7
+    }
+  </style>
 </head>
 <body>
-  <h2>📍 Captura de Ubicación</h2>
-  <p>Haz clic en el botón para registrar tu ubicación.</p>
-  <button onclick="getLocation()">Enviar ubicación</button>
+  <main class="card" role="main" aria-label="Reloj Checador">
+    <div class="logo">⏱️</div>
+    <div class="title">Reloj Checador</div>
+    <div class="subtitle">Comparte tu ubicación para registrar tu asistencia</div>
+
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="date" id="date">—</div>
+
+    <button id="btn" class="btn" type="button" aria-live="polite">
+      <div class="spinner" id="spin" style="display:none"></div>
+      <span id="btnText">Enviar ubicación</span>
+    </button>
+    <div class="hint">Requiere activar GPS y conceder permiso de ubicación</div>
+
+    <div id="status" class="status" role="status"></div>
+    <div class="foot">© APS • Seguro y simple</div>
+  </main>
 
   <script>
-    function getLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
-      } else {
-        alert("La geolocalización no es soportada por este navegador.");
+    // ========== reloj ==========
+    const $clock = document.getElementById('clock');
+    const $date  = document.getElementById('date');
+    function pad(n){return String(n).padStart(2,'0')}
+    function tick(){
+      const d = new Date();
+      $clock.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      $date.textContent  = d.toLocaleDateString('es-MX', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    }
+    tick(); setInterval(tick, 1000);
+
+    // ========== utilidades ==========
+    const qs = Object.fromEntries(new URLSearchParams(location.search).entries());
+    const $btn = document.getElementById('btn');
+    const $spin = document.getElementById('spin');
+    const $btnText = document.getElementById('btnText');
+    const $status = document.getElementById('status');
+
+    function setStatus(text, cls=''){
+      $status.className = `status ${cls}`.trim();
+      $status.textContent = text;
+    }
+    function lock(btn){
+      btn.disabled = true; $spin.style.display='inline-block'; $btnText.textContent='Obteniendo GPS…';
+    }
+    function unlock(btn){
+      btn.disabled = false; $spin.style.display='none'; $btnText.textContent='Enviar ubicación';
+    }
+
+    // ========== envío ==========
+    async function sendToMake(payload){
+      const endpoint = "https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr"; // <— REEMPLAZA AQUÍ
+      const res = await fetch(endpoint, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.text();
+    }
+
+    // ========== obtener geolocalización ==========
+    function getLocation(){
+      if(!('geolocation' in navigator)){
+        setStatus('Este navegador no soporta geolocalización.', 'err'); return;
       }
+      lock($btn);
+      setStatus('Solicitando permiso de ubicación…');
+
+      navigator.geolocation.getCurrentPosition(async (pos)=>{
+        const { latitude, longitude, accuracy } = pos.coords;
+        const payload = {
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          timestamp: pos.timestamp,
+          user_agent: navigator.userAgent,
+          tz_offset_minutes: new Date().getTimezoneOffset() * -1,
+          token: qs.token || null,        // Si mandas ?token=...
+          phone_hint: qs.phone || null    // Si mandas ?phone=...
+        };
+
+        try{
+          await sendToMake(payload);
+          const precise = accuracy <= 50;
+          setStatus(`Registro enviado. Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)} · Precisión ±${Math.round(accuracy)} m`, precise ? 'ok' : 'warn');
+          if(!precise){
+            setStatus(`Registro enviado (precisión ±${Math.round(accuracy)} m). Si estás en interior, acércate a una ventana para mejor señal.`, 'warn');
+          }
+        }catch(e){
+          setStatus('Error al enviar la ubicación. Reintenta en unos segundos.', 'err');
+        }finally{
+          unlock($btn);
+        }
+      }, (err)=>{
+        const msg = ({
+          1: 'Permiso denegado. Habilita ubicación para continuar.',
+          2: 'Posición no disponible. Intenta de nuevo.',
+          3: 'Tiempo de espera agotado. Reintenta.'
+        })[err.code] || err.message;
+
+        setStatus(`No se pudo obtener ubicación: ${msg}`, 'err');
+        unlock($btn);
+      }, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      });
     }
 
-    function success(pos) {
-      fetch("https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          lat: pos.coords.latitude,
-          lon: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          timestamp: pos.timestamp
-        })
-      })
-      .then(() => alert("✅ Ubicación enviada correctamente"))
-      .catch(() => alert("❌ Error al enviar ubicación"));
-    }
-
-    function error(err) {
-      alert("No se pudo obtener ubicación: " + err.message);
-    }
+    $btn.addEventListener('click', getLocation);
   </script>
 </body>
 </html>
+       
