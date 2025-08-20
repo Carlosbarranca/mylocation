@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Captura de ubicación</title>
+</head>
+<body>
+  <h2>📍 Captura de Ubicación</h2>
+  <p>Haz clic en el botón para registrar tu ubicación.</p>
+  <button onclick="getLocation()">Enviar ubicación</button>
+
+  <script>
+    function getLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
+      } else {
+        alert("La geolocalización no es soportada por este navegador.");
+      }
+    }
+
+    function success(pos) {
+      fetch("https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp
+        })
+      })
+      .then(() => alert("✅ Ubicación enviada correctamente"))
+      .catch(() => alert("❌ Error al enviar ubicación"));
+    }
+
+    function error(err) {
+      alert("No se pudo obtener ubicación: " + err.message);
+    }
+  </script>
+</body>
+</html>
