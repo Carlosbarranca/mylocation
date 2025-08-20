@@ -1,0 +1,18 @@
+<script>
+navigator.geolocation.getCurrentPosition(success, error, { enableHighAccuracy: true });
+function success(pos) {
+  fetch("https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      timestamp: pos.timestamp
+    })
+  });
+}
+function error(err) {
+  alert("No se pudo obtener ubicación: " + err.message);
+}
+</script>
