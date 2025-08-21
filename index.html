@@ -40,7 +40,12 @@
       margin:18px 0 8px; font-weight:600; font-variant-numeric:tabular-nums;
       font-size:42px; letter-spacing:1px;
     }
-    .date{color:var(--muted); font-size:13px; margin-bottom:18px}
+    .date{color:var(--muted); font-size:13px; margin-bottom:8px}
+    .elapsed{
+      margin:6px 0 12px;
+      font-weight:600; font-variant-numeric:tabular-nums; font-size:18px;
+      display:none;
+    }
     .btn{
       display:inline-flex; gap:10px; align-items:center; justify-content:center;
       width:100%; max-width:280px; margin:12px auto 0; padding:14px 18px;
@@ -76,10 +81,11 @@
 
     <div class="clock" id="clock">--:--:--</div>
     <div class="date" id="date">—</div>
+    <div class="elapsed" id="elapsed" aria-live="polite">Tiempo en jornada: 00:00:00</div>
 
     <button id="btn" class="btn" type="button" aria-live="polite">
       <div class="spinner" id="spin" style="display:none"></div>
-      <span id="btnText">Enviar ubicación</span>
+      <span id="btnText">Clock in</span>
     </button>
     <div class="hint">Requiere activar GPS y conceder permiso de ubicación</div>
 
@@ -88,7 +94,7 @@
   </main>
 
   <script>
-    // ========== reloj ==========
+    // ========= reloj (hora actual) =========
     const $clock = document.getElementById('clock');
     const $date  = document.getElementById('date');
     function pad(n){return String(n).padStart(2,'0')}
@@ -99,27 +105,75 @@
     }
     tick(); setInterval(tick, 1000);
 
-    // ========== utilidades ==========
+    // ========= utilidades UI =========
     const qs = Object.fromEntries(new URLSearchParams(location.search).entries());
     const $btn = document.getElementById('btn');
     const $spin = document.getElementById('spin');
     const $btnText = document.getElementById('btnText');
     const $status = document.getElementById('status');
+    const $elapsed = document.getElementById('elapsed');
 
     function setStatus(text, cls=''){
       $status.className = `status ${cls}`.trim();
       $status.textContent = text;
     }
     function lock(btn){
-      btn.disabled = true; $spin.style.display='inline-block'; $btnText.textContent='Obteniendo GPS…';
+      btn.disabled = true; $spin.style.display='inline-block';
     }
     function unlock(btn){
-      btn.disabled = false; $spin.style.display='none'; $btnText.textContent='Enviar ubicación';
+      btn.disabled = false; $spin.style.display='none';
     }
 
-    // ========== envío ==========
+    // ========= identidad local (token y device_id) =========
+    const token = qs.token || null;              // Se espera ?token=... desde WhatsApp
+    const SKEY = `checador:${token||'anon'}:start_ts`;
+    const DKEY = 'checador:device_id';
+
+    function uuidv4(){
+      if (crypto && crypto.getRandomValues){
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+          const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
+      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+    let device_id = localStorage.getItem(DKEY);
+    if(!device_id){ try{ device_id = uuidv4(); localStorage.setItem(DKEY, device_id); }catch(e){ device_id = 'na'; } }
+
+    // ========= estado de jornada (cronómetro) =========
+    let start_ts = Number(localStorage.getItem(SKEY)) || null;
+    let chronoTimer = null;
+
+    function formatHMS(ms){
+      const total = Math.max(0, Math.floor(ms/1000));
+      const h = Math.floor(total/3600);
+      const m = Math.floor((total%3600)/60);
+      const s = total%60;
+      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+    }
+    function renderState(){
+      if (start_ts){
+        $btnText.textContent = 'Clock out';
+        $elapsed.style.display = '';
+        if(!chronoTimer){
+          $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
+          chronoTimer = setInterval(()=>{
+            $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
+          }, 1000);
+        }
+      } else {
+        $btnText.textContent = 'Clock in';
+        $elapsed.style.display = 'none';
+        if(chronoTimer){ clearInterval(chronoTimer); chronoTimer = null; }
+      }
+    }
+    renderState();
+
+    // ========= envío al webhook =========
     async function sendToMake(payload){
-      const endpoint = "https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr"; // <— REEMPLAZA AQUÍ
+      const endpoint = "https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr"; // tu webhook Make
       const res = await fetch(endpoint, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -129,8 +183,7 @@
       return res.text();
     }
 
-    // ========== obtener geolocalización ==========
-    function getLocation(){
+    function submit(action){
       if(!('geolocation' in navigator)){
         setStatus('Este navegador no soporta geolocalización.', 'err'); return;
       }
@@ -140,23 +193,30 @@
       navigator.geolocation.getCurrentPosition(async (pos)=>{
         const { latitude, longitude, accuracy } = pos.coords;
         const payload = {
+          action,                         // "checkin" | "checkout"
+          token: token,
+          device_id: device_id,
+          client_ts: Date.now(),
+          ...(action === 'checkout' ? { start_ts_client: start_ts } : {}),
           lat: latitude,
           lon: longitude,
           accuracy,
           timestamp: pos.timestamp,
           user_agent: navigator.userAgent,
-          tz_offset_minutes: new Date().getTimezoneOffset() * -1,
-          token: qs.token || null,        // Si mandas ?token=...
-          phone_hint: qs.phone || null    // Si mandas ?phone=...
+          tz_offset_minutes: new Date().getTimezoneOffset() * -1
         };
 
         try{
           await sendToMake(payload);
-          const precise = accuracy <= 50;
-          setStatus(`Registro enviado. Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)} · Precisión ±${Math.round(accuracy)} m`, precise ? 'ok' : 'warn');
-          if(!precise){
-            setStatus(`Registro enviado (precisión ±${Math.round(accuracy)} m). Si estás en interior, acércate a una ventana para mejor señal.`, 'warn');
+          if(action === 'checkin'){
+            start_ts = Date.now();
+            localStorage.setItem(SKEY, String(start_ts));
+          }else{
+            localStorage.removeItem(SKEY);
+            start_ts = null;
           }
+          renderState();
+          setStatus('Registro enviado satisfactoriamente.', 'ok');
         }catch(e){
           setStatus('Error al enviar la ubicación. Reintenta en unos segundos.', 'err');
         }finally{
@@ -168,7 +228,6 @@
           2: 'Posición no disponible. Intenta de nuevo.',
           3: 'Tiempo de espera agotado. Reintenta.'
         })[err.code] || err.message;
-
         setStatus(`No se pudo obtener ubicación: ${msg}`, 'err');
         unlock($btn);
       }, {
@@ -178,8 +237,11 @@
       });
     }
 
-    $btn.addEventListener('click', getLocation);
+    // Click: decide checkin/checkout según estado
+    $btn.addEventListener('click', ()=>{
+      const action = start_ts ? 'checkout' : 'checkin';
+      submit(action);
+    });
   </script>
 </body>
-</html>
-       
+</html>     
