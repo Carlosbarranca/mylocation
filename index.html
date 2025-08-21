@@ -8,16 +8,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#0e0f13;
-      --card:#171923;
-      --text:#eef2ff;
-      --muted:#a2a8bd;
-      --brand:#4f8cff;
-      --brand-pressed:#3a6ad1;
-      --success:#2ecc71;
-      --warning:#ffb020;
-      --error:#ff5d5d;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --bg:#0e0f13; --card:#171923; --text:#eef2ff; --muted:#a2a8bd;
+      --brand:#4f8cff; --brand-pressed:#3a6ad1; --success:#2ecc71;
+      --warning:#ffb020; --error:#ff5d5d; --shadow:0 10px 30px rgba(0,0,0,.35);
       --radius:18px;
     }
     *{box-sizing:border-box}
@@ -30,22 +23,15 @@
     }
     .card{
       width:100%; max-width:440px; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-      border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); box-shadow:var(--shadow);
-      padding:28px 22px 24px; text-align:center; backdrop-filter: blur(8px);
+      border:1px solid rgba(255,255,255,.06); border-radius:var(--radius);
+      box-shadow:var(--shadow); padding:28px 22px 24px; text-align:center; backdrop-filter: blur(8px);
     }
     .logo{font-size:28px; line-height:1; margin-bottom:6px}
     .title{font-weight:600; font-size:22px; letter-spacing:.2px}
     .subtitle{margin-top:6px; color:var(--muted); font-size:14px}
-    .clock{
-      margin:18px 0 8px; font-weight:600; font-variant-numeric:tabular-nums;
-      font-size:42px; letter-spacing:1px;
-    }
+    .clock{margin:18px 0 8px; font-weight:600; font-variant-numeric:tabular-nums; font-size:42px; letter-spacing:1px;}
     .date{color:var(--muted); font-size:13px; margin-bottom:8px}
-    .elapsed{
-      margin:6px 0 12px;
-      font-weight:600; font-variant-numeric:tabular-nums; font-size:18px;
-      display:none;
-    }
+    .elapsed{margin:6px 0 12px; font-weight:600; font-variant-numeric:tabular-nums; font-size:18px;}
     .btn{
       display:inline-flex; gap:10px; align-items:center; justify-content:center;
       width:100%; max-width:280px; margin:12px auto 0; padding:14px 18px;
@@ -55,22 +41,12 @@
     }
     .btn:active{transform:translateY(1px); background:var(--brand-pressed)}
     .btn[disabled]{opacity:.6; cursor:not-allowed; transform:none}
-
     .hint{color:var(--muted); font-size:12px; margin-top:10px}
-    .status{
-      margin-top:16px; font-size:14px; line-height:1.5; color:var(--muted);
-    }
-    .status.ok{color:var(--success)}
-    .status.warn{color:var(--warning)}
-    .status.err{color:var(--error)}
-    .spinner{
-      width:16px; height:16px; border-radius:50%;
-      border:2px solid rgba(255,255,255,.25); border-top-color:#fff; animation:spin .9s linear infinite;
-    }
+    .status{margin-top:16px; font-size:14px; line-height:1.5; color:var(--muted);}
+    .status.ok{color:var(--success)} .status.warn{color:var(--warning)} .status.err{color:var(--error)}
+    .spinner{width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,.25); border-top-color:#fff; animation:spin .9s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .foot{
-      margin-top:18px; color:var(--muted); font-size:11px; opacity:.7
-    }
+    .foot{margin-top:18px; color:var(--muted); font-size:11px; opacity:.7}
   </style>
 </head>
 <body>
@@ -85,7 +61,7 @@
 
     <button id="btn" class="btn" type="button" aria-live="polite">
       <div class="spinner" id="spin" style="display:none"></div>
-      <span id="btnText">Clock in</span>
+      <span id="btnText">Registrar entrada</span>
     </button>
     <div class="hint">Requiere activar GPS y conceder permiso de ubicación</div>
 
@@ -94,7 +70,7 @@
   </main>
 
   <script>
-    // ========= reloj (hora actual) =========
+    // ===== reloj (hora actual) =====
     const $clock = document.getElementById('clock');
     const $date  = document.getElementById('date');
     function pad(n){return String(n).padStart(2,'0')}
@@ -105,7 +81,7 @@
     }
     tick(); setInterval(tick, 1000);
 
-    // ========= utilidades UI =========
+    // ===== UI & estado =====
     const qs = Object.fromEntries(new URLSearchParams(location.search).entries());
     const $btn = document.getElementById('btn');
     const $spin = document.getElementById('spin');
@@ -113,22 +89,20 @@
     const $status = document.getElementById('status');
     const $elapsed = document.getElementById('elapsed');
 
-    function setStatus(text, cls=''){
-      $status.className = `status ${cls}`.trim();
-      $status.textContent = text;
-    }
-    function lock(btn){
-      btn.disabled = true; $spin.style.display='inline-block';
-    }
-    function unlock(btn){
-      btn.disabled = false; $spin.style.display='none';
+    function setStatus(text, cls=''){ $status.className = `status ${cls}`.trim(); $status.textContent = text; }
+    function lock(btn){ btn.disabled = true; $spin.style.display='inline-block'; }
+    function unlock(btn){ btn.disabled = false; $spin.style.display='none'; }
+
+    // ===== autenticación mínima: token obligatorio =====
+    const token = qs.token || null; // se espera ?token=... desde WhatsApp
+    if(!token){
+      $btn.disabled = true;
+      setStatus('Acceso restringido. Abre el enlace desde WhatsApp (token faltante).', 'err');
     }
 
-    // ========= identidad local (token y device_id) =========
-    const token = qs.token || null;              // Se espera ?token=... desde WhatsApp
+    // ===== identidad local =====
     const SKEY = `checador:${token||'anon'}:start_ts`;
     const DKEY = 'checador:device_id';
-
     function uuidv4(){
       if (crypto && crypto.getRandomValues){
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
@@ -142,10 +116,9 @@
     let device_id = localStorage.getItem(DKEY);
     if(!device_id){ try{ device_id = uuidv4(); localStorage.setItem(DKEY, device_id); }catch(e){ device_id = 'na'; } }
 
-    // ========= estado de jornada (cronómetro) =========
+    // ===== cronómetro =====
     let start_ts = Number(localStorage.getItem(SKEY)) || null;
     let chronoTimer = null;
-
     function formatHMS(ms){
       const total = Math.max(0, Math.floor(ms/1000));
       const h = Math.floor(total/3600);
@@ -153,56 +126,75 @@
       const s = total%60;
       return `${pad(h)}:${pad(m)}:${pad(s)}`;
     }
+    function startChrono(){
+      if(chronoTimer) return;
+      $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
+      chronoTimer = setInterval(()=>{
+        $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
+      }, 1000);
+    }
+    function stopChrono(){
+      if(chronoTimer){ clearInterval(chronoTimer); chronoTimer = null; }
+      $elapsed.textContent = 'Tiempo en jornada: 00:00:00';
+    }
     function renderState(){
-      if (start_ts){
-        $btnText.textContent = 'Clock out';
-        $elapsed.style.display = '';
-        if(!chronoTimer){
-          $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
-          chronoTimer = setInterval(()=>{
-            $elapsed.textContent = `Tiempo en jornada: ${formatHMS(Date.now() - start_ts)}`;
-          }, 1000);
-        }
-      } else {
-        $btnText.textContent = 'Clock in';
-        $elapsed.style.display = 'none';
-        if(chronoTimer){ clearInterval(chronoTimer); chronoTimer = null; }
+      if(start_ts){
+        $btnText.textContent = 'Registrar salida';
+        startChrono();
+      }else{
+        $btnText.textContent = 'Registrar entrada';
+        stopChrono();
       }
     }
     renderState();
 
-    // ========= envío al webhook =========
+    // ===== envío al webhook =====
     async function sendToMake(payload){
       const endpoint = "https://hook.us1.make.com/7u1g4v8otjw7i3w19v0jcls87g68n7cr"; // tu webhook Make
       const res = await fetch(endpoint, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
       });
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.text();
+      return res.json().catch(()=> ({}));
     }
 
-    function submit(action){
-      if(!('geolocation' in navigator)){
-        setStatus('Este navegador no soporta geolocalización.', 'err'); return;
+    // ===== prevalidación opcional en servidor =====
+    const ENABLE_PREFLIGHT = false; // cambia a true cuando tengas el endpoint 'validate' en Make
+    async function preflight(){
+      if(!token) return; // ya bloqueado arriba
+      if(!ENABLE_PREFLIGHT){ return; }
+      try{
+        const r = await sendToMake({ action:'validate', token, device_id });
+        if(!r || r.ok !== true){
+          $btn.disabled = true; setStatus('Token inválido o expirado. Solicita un nuevo enlace por WhatsApp.', 'err'); return;
+        }
+        // Si el servidor informa sesión abierta, sincroniza cronómetro
+        if(r.session_open && r.start_ts_server){
+          start_ts = Number(r.start_ts_server);
+          localStorage.setItem(SKEY, String(start_ts));
+        }
+        renderState();
+      }catch(e){
+        setStatus('No se pudo validar el token en este momento. Puedes intentar continuar.', 'warn');
       }
+    }
+    preflight();
+
+    // ===== flujo de envío con geolocalización =====
+    function submit(action){
+      if(!token){ return; }
+      if(!('geolocation' in navigator)){ setStatus('Este navegador no soporta geolocalización.', 'err'); return; }
       lock($btn);
       setStatus('Solicitando permiso de ubicación…');
 
       navigator.geolocation.getCurrentPosition(async (pos)=>{
         const { latitude, longitude, accuracy } = pos.coords;
         const payload = {
-          action,                         // "checkin" | "checkout"
-          token: token,
-          device_id: device_id,
+          action, token, device_id,
           client_ts: Date.now(),
           ...(action === 'checkout' ? { start_ts_client: start_ts } : {}),
-          lat: latitude,
-          lon: longitude,
-          accuracy,
-          timestamp: pos.timestamp,
-          user_agent: navigator.userAgent,
+          lat: latitude, lon: longitude, accuracy,
+          timestamp: pos.timestamp, user_agent: navigator.userAgent,
           tz_offset_minutes: new Date().getTimezoneOffset() * -1
         };
 
@@ -219,29 +211,19 @@
           setStatus('Registro enviado satisfactoriamente.', 'ok');
         }catch(e){
           setStatus('Error al enviar la ubicación. Reintenta en unos segundos.', 'err');
-        }finally{
-          unlock($btn);
-        }
+        }finally{ unlock($btn); }
       }, (err)=>{
-        const msg = ({
-          1: 'Permiso denegado. Habilita ubicación para continuar.',
-          2: 'Posición no disponible. Intenta de nuevo.',
-          3: 'Tiempo de espera agotado. Reintenta.'
-        })[err.code] || err.message;
+        const msg = ({1:'Permiso denegado. Habilita ubicación.',2:'Posición no disponible.',3:'Tiempo de espera agotado.'})[err.code] || err.message;
         setStatus(`No se pudo obtener ubicación: ${msg}`, 'err');
         unlock($btn);
-      }, {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0
-      });
+      }, { enableHighAccuracy:true, timeout:15000, maximumAge:0 });
     }
 
-    // Click: decide checkin/checkout según estado
+    // Click: decide entrada/salida según estado
     $btn.addEventListener('click', ()=>{
       const action = start_ts ? 'checkout' : 'checkin';
       submit(action);
     });
   </script>
 </body>
-</html>     
+</html>
